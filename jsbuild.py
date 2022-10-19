@@ -112,7 +112,7 @@ def read_file_http(url):
 
 
 def read_file(url):
-    logging.debug(f"Reading {urlunparse(url)}...")
+    logger.debug(f"Reading {urlunparse(url)}...")
     scheme = url.scheme
     handler_name = f"read_file_{scheme}"
 
@@ -144,13 +144,13 @@ def java_check():
     try:
         res = subprocess.run([ARGS.java, "-version"], capture_output=True)
         assert res.returncode == 0
-        logging.debug("Java is installed.")
+        logger.debug("Java is installed.")
 
         for line in res.stderr.decode("utf-8").splitlines():
-            logging.debug(f"[java -version] {line.strip()}")
+            logger.debug(f"[java -version] {line.strip()}")
         return True
     except Exception:
-        logging.error("Java is not installed. Please install Java.")
+        logger.error("Java is not installed. Please install Java.")
         sys.exit(1)
 
 
@@ -192,7 +192,7 @@ def closure_compile(path):
     proc = subprocess.run(params, cwd=path, capture_output=True)
 
     for err_line in proc.stderr.decode("utf-8").splitlines():
-        logging.warn(f"[closure] {err_line.strip()}")
+        logger.warning(f"[closure] {err_line.strip()}")
     return proc.stdout.decode("utf-8")
 
 
@@ -462,7 +462,7 @@ def action_doctor():
                 else:
                     print("ERROR (run with --verbose for more info)")
             end_time = time.monotonic()
-            logging.debug(f"Check {name} took {end_time - start_time} seconds")
+            logger.debug(f"Check {name} took {end_time - start_time} seconds")
 
 
 # Command-line arguments
@@ -524,11 +524,11 @@ sp.set_defaults(func=action_doctor)
 ARGS = parser.parse_args()
 
 if ARGS.verbose:
-    logging.getLogger().setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
 
 logger.debug(f"Welcome to {NAME} v{VERSION}!")
 logger.debug(f"Caching files in {CACHE_DIR}.")
-logging.debug(f"Using temporary directory {TEMPDIR}")
+logger.debug(f"Using temporary directory {TEMPDIR}")
 
 
 def main():
