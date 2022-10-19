@@ -182,16 +182,7 @@ def closure_compile(path):
 
     # Output
     params.append("--language_out")
-    params.append("ECMASCRIPT_NEXT")
-
-    # HTML Output
-    if ARGS.html:
-        params.append("--output_wrapper")
-        params.append(
-            '<!DOCTYPE html><html><head><meta charset="utf-8"/>'
-            "</head><body><script>(async function() {%output%}).call(this);"
-            "</script></body></html>"
-        )
+    params.append(ARGS.language_out)
 
     # Entry point
     params.append("--js")
@@ -516,7 +507,7 @@ sp.set_defaults(func=action_build)
 sp.add_argument("file", help="The main file")
 sp.add_argument("--output", help="The output file", nargs="?")
 sp.add_argument(
-    "--html", action="store_true", help="Output a basic HTML wrapper"
+    "--language_out", help="The language to use", default="ECMASCRIPT_2019"
 )
 
 # [action] nuke-cache
