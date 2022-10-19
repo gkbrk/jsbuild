@@ -174,7 +174,6 @@ def closure_compile(path):
     params.append("--compilation_level")
     params.append("ADVANCED_OPTIMIZATIONS")
     params.append("--assume_function_wrapper")
-    # params.append("--use_types_for_optimization")
     params.append("--isolation_mode")
     params.append("IIFE")
     params.append("--dependency_mode")
@@ -376,6 +375,7 @@ def action_nuke_cache():
         print(f"  {f}")
         f.unlink()
     print("Done.")
+
 
 # Doctor checks
 
