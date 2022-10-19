@@ -193,7 +193,7 @@ def closure_compile(path):
 
     for err_line in proc.stderr.decode("utf-8").splitlines():
         logger.warning(f"[closure] {err_line.strip()}")
-    return proc.stdout.decode("utf-8")
+    return proc.stdout.decode("utf-8").strip().replace("\n", "")
 
 
 # Deps
@@ -362,7 +362,7 @@ def action_build():
         output_path = Path(ARGS.output).resolve()
         output_path.write_text(output)
     else:
-        print(output)
+        print(output, end="")
 
 
 def action_nuke_cache():
