@@ -27,6 +27,11 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import ParseResult as URL
+from typing import Iterable
+from typing import List
+from typing import Tuple
+from typing import Union
 
 NAME = "jsbuild"
 VERSION = "0.0.1"
@@ -74,8 +79,8 @@ CACHE_DIR = cache_dir()
 
 
 def cache_path(key: str) -> Path:
-    key = key.encode("utf-8")
-    return CACHE_DIR / hash_buffer(key)
+    key_utf8 = key.encode("utf-8")
+    return CACHE_DIR / hash_buffer(key_utf8)
 
 
 # HTTP
@@ -102,16 +107,16 @@ def http_cache_or_download(url: str) -> str:
 # here.
 
 
-def read_file_file(url):
+def read_file_file(url: URL) -> str:
     p = Path(url.path)
     return p.read_bytes().decode("utf-8")
 
 
-def read_file_http(url):
+def read_file_http(url: URL) -> str:
     return http_cache_or_download(urlunparse(url))
 
 
-def read_file(url):
+def read_file(url: URL) -> str:
     logger.debug(f"Reading {urlunparse(url)}...")
     scheme = url.scheme
     handler_name = f"read_file_{scheme}"
@@ -126,7 +131,7 @@ def read_file(url):
 # Relative and absolute URLs
 
 
-def resolve_absolute(current, new):
+def resolve_absolute(current: str, new: str) -> URL:
     merged = urljoin(current, new)
     return urlparse(merged)
 
@@ -154,10 +159,10 @@ def java_check():
         sys.exit(1)
 
 
-def closure_compile(path):
+def closure_compile(path: Path):
     java_check()  # Make sure Java is installed.
 
-    params = []
+    params: List[Union[str, Path]] = []
 
     # Run the CLOSURE jar file
     params.append(ARGS.java)
@@ -199,7 +204,7 @@ def closure_compile(path):
 # Deps
 
 
-def import_statements_recursive(url):
+def import_statements_recursive(url: URL) -> Iterable[Tuple[URL, URL]]:
     content = read_file(url)
 
     for line in content.split("\n"):
@@ -211,7 +216,9 @@ def import_statements_recursive(url):
             yield from import_statements_recursive(new_url)
 
 
-def patch_import_statement(line, current_path, inside_import=False):
+def patch_import_statement(
+    line: str, current_path: str, inside_import: bool = False
+):
     # TODO: Accept single-quotes as well
     m = re.match('^import (.*?) from "(.*?)";$', line)
     if m:
@@ -244,7 +251,7 @@ def action_list_deps():
     """
     path = Path(ARGS.file)
 
-    printed = set()
+    printed: set[str] = set()
 
     absolute = f"file://{path.resolve().absolute()}"
 
@@ -269,11 +276,11 @@ def action_dependency_dag():
 
     dot_file = ""
 
-    deps = set()
+    deps: set[Tuple[str, str]] = set()
     for src, target in import_statements_recursive(url):
         deps.add((urlunparse(src), urlunparse(target)))
 
-    nodes = set()
+    nodes: set[str] = set()
 
     for x, y in deps:
         nodes.add(x)
@@ -334,7 +341,7 @@ def action_build():
             )
 
     os.makedirs(TEMPDIR / "imports")
-    imports = set()
+    imports: set[URL] = set()
 
     for _, url in import_statements_recursive(
         urlparse(f"file://{path.resolve()}")
