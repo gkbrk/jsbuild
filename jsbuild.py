@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # jsbuild: Javascript builder and package manager
-# Copyright 2021-2022 Gokberk Yaltirakli
+# Copyright 2021-2023 Gokberk Yaltirakli
 # SPDX-License-Identifier: Apache-2.0
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,8 +30,12 @@ from typing import Iterable, List, Tuple, Union
 from urllib.parse import ParseResult as URL
 from urllib.parse import urljoin, urlparse, urlunparse
 
+# TODO: Investigate support for multiple backends (like esbuild and uglify)
+# TODO: Investigate support for multiple languages (like TypeScript)
+# TODO: Build a debug compiler that builds quickly but doesn't optimize
+
 NAME = "jsbuild"
-VERSION = "0.0.1"
+VERSION = "0.0.5"
 
 # Logging
 
@@ -142,21 +146,33 @@ CLOSURE_URL = f"{REPO}/{PROJECT}/{VER}/closure-compiler-{VER}.jar"
 CLOSURE = cache_path(CLOSURE_URL)
 
 
-def java_check():
+def java_check() -> bool:
     try:
         res = subprocess.run([ARGS.java, "-version"], capture_output=True)
         assert res.returncode == 0
         logger.debug("Java is installed.")
 
         for line in res.stderr.decode("utf-8").splitlines():
-            logger.debug(f"[java -version] {line.strip()}")
+            logger.debug("[java -version] %s", line.strip())
         return True
     except Exception:
         logger.error("Java is not installed. Please install Java.")
         sys.exit(1)
 
 
-def closure_compile(path: Path):
+def closure_compile(path: Path) -> str:
+    """Compile a given file with the Closure compiler.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the file to compile.
+
+    Returns
+    -------
+    str
+        The contents of the compiled file.
+    """
     java_check()  # Make sure Java is installed.
 
     params: List[Union[str, Path]] = []
@@ -184,6 +200,8 @@ def closure_compile(path: Path):
     # Output
     params.append("--language_out")
     params.append(ARGS.language_out)
+    params.append("--js_output_file")
+    params.append("output.js")
 
     # Entry point
     params.append("--js")
@@ -225,8 +243,7 @@ def patch_import_statement(
         h = hash_buffer(url)
         if inside_import:
             return f'import {m.group(1)} from "./{h}.js";'
-        else:
-            return f'import {m.group(1)} from "./imports/{h}.js";'
+        return f'import {m.group(1)} from "./imports/{h}.js";'
     return line
 
 
@@ -242,9 +259,9 @@ def patch_import_statement(
 
 
 def action_list_deps():
-    """Prints the list of dependencies that are included by your program. Note
-    that the output of this command includes the dependencies recursively.
+    """Print the list of dependencies that are included by your program.
 
+    Note that the output of this command includes the dependencies recursively.
     """
     path = Path(ARGS.file)
 
@@ -260,31 +277,34 @@ def action_list_deps():
 
 
 def action_dependency_dag():
-    """Draws a Directed Acyclic Graph of the dependency tree.
+    """Draw a Directed Acyclic Graph of the dependency tree.
 
     This requires `Graphviz` to generate the tree image and `feh` to display it
     on the screen.
 
+    Notes
+    -----
+    This command needs graphviz and feh to be installed on your system.
     """
-    path = Path(ARGS.file).resolve()
-    url = f"file://{path}"
-    _url = url
-    url = urlparse(url)
+    url = f"file://{Path(ARGS.file).resolve()}"
 
     dot_file = ""
-
-    deps: set[Tuple[str, str]] = set()
-    for src, target in import_statements_recursive(url):
-        deps.add((urlunparse(src), urlunparse(target)))
-
     nodes: set[str] = set()
-
-    for x, y in deps:
-        nodes.add(x)
-        nodes.add(y)
 
     dot_file += "digraph {\n"
     dot_file += "graph [splines=true overlap=false];\n"
+
+    for src, target in import_statements_recursive(urlparse(url)):
+        _src = str(urlunparse(src))
+        _target = str(urlunparse(target))
+
+        _h_src = hash_buffer(_src.encode("utf-8"))
+        _h_target = hash_buffer(_target.encode("utf-8"))
+
+        dot_file += f'"{_h_target}" -> "{_h_src}"\n'
+
+        nodes.add(_src)
+        nodes.add(_target)
 
     for n in nodes:
         h = hash_buffer(n.encode("utf-8"))
@@ -297,16 +317,12 @@ def action_dependency_dag():
         attr = f'"{h}" [label = "{n}" shape="{shape}"'
 
         # Mark the build target in red to make the graph easier to read.
-        if n == _url:
+        if n == url:
             attr += " color = red"
 
         attr += "];\n"
         dot_file += attr
 
-    for source, target in deps:
-        h_source = hash_buffer(source.encode("utf-8"))
-        h_target = hash_buffer(target.encode("utf-8"))
-        dot_file += f'"{h_target}" -> "{h_source}"\n'
     dot_file += "}\n"
     dot_file = dot_file.encode("utf-8")
 
@@ -321,21 +337,20 @@ def action_dependency_dag():
 
 
 def action_ensure_closure():
-    """
-    Downloads or updates the Closure compiler.
-    """
+    """Download or update the Closure compiler."""
     subprocess.run(["curl", "-o", cache_path(CLOSURE_URL), CLOSURE_URL])
 
 
 def action_build():
-    """Fetches all the dependencies of the input file and builds it."""
+    """Fetch all the dependencies of the input file and build it."""
     path = Path(ARGS.file).resolve()
 
     with (TEMPDIR / "main.js").open("w+") as main_file:
-        for line in path.open("r"):
-            main_file.write(
-                patch_import_statement(line, f"file://{path}") + "\n"
-            )
+        with path.open("r") as f:
+            for line in f:
+                main_file.write(
+                    patch_import_statement(line, f"file://{path}") + "\n"
+                )
 
     os.makedirs(TEMPDIR / "imports")
     imports: set[URL] = set()
@@ -364,14 +379,13 @@ def action_build():
 
     if ARGS.output:
         output_path = Path(ARGS.output).resolve()
-        output_path.write_text(output)
+        output_path.write_text(output, encoding="utf-8")
     else:
         print(output, end="")
 
 
 def action_nuke_cache():
-    """Deletes the cached files."""
-
+    """Delete the cached files."""
     print("Deleting cached files...")
 
     # Do not remove the cache directory itself, just its contents.
@@ -384,36 +398,28 @@ def action_nuke_cache():
 # Doctor checks
 
 
-def doctor_check_java():
+def try_run(*cmd: str) -> bool:
     try:
-        subprocess.run(["java", "-version"], capture_output=True)
+        subprocess.run(cmd, capture_output=True, check=True)
+        return True
     except FileNotFoundError:
         return False
-    return True
+
+
+def doctor_check_java():
+    return try_run(ARGS.java, "-version")
 
 
 def doctor_check_curl():
-    try:
-        subprocess.run(["curl", "--version"], capture_output=True)
-    except FileNotFoundError:
-        return False
-    return True
+    return try_run("curl", "--version")
 
 
 def doctor_check_graphviz():
-    try:
-        subprocess.run(["dot", "-V"], capture_output=True)
-    except FileNotFoundError:
-        return False
-    return True
+    return try_run("dot", "-V")
 
 
 def doctor_check_feh():
-    try:
-        subprocess.run(["feh", "--version"], capture_output=True)
-    except FileNotFoundError:
-        return False
-    return True
+    return try_run("feh", "--version")
 
 
 def doctor_check_closure_file():
@@ -421,20 +427,11 @@ def doctor_check_closure_file():
 
 
 def doctor_check_closure_version():
-    try:
-        proc = subprocess.run(
-            [ARGS.java, "-jar", str(CLOSURE), "--version"],
-            capture_output=True,
-        )
-        if proc.returncode != 0:
-            return False
-    except FileNotFoundError:
-        return False
-    return True
+    return try_run(ARGS.java, "-jar", str(CLOSURE), "--version")
 
 
 def action_doctor():
-    """Checks if the environment is ready to run the tool."""
+    """Check if the environment is ready to run the tool."""
     print("Welcome to the doctor!")
     print("")
     print("This tool will check if your environment is ready to run the tool.")
