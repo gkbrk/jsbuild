@@ -26,12 +26,9 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urljoin, urlparse, urlunparse
+from typing import Iterable, List, Tuple, Union
 from urllib.parse import ParseResult as URL
-from typing import Iterable
-from typing import List
-from typing import Tuple
-from typing import Union
+from urllib.parse import urljoin, urlparse, urlunparse
 
 NAME = "jsbuild"
 VERSION = "0.0.1"
