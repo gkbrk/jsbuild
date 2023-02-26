@@ -35,8 +35,8 @@ VERSION = "0.0.1"
 
 # Logging
 
-log_format = "%(asctime)s %(levelname)s %(message)s"
-logging.basicConfig(level=logging.INFO, format=log_format)
+LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(NAME)
 
 
@@ -93,7 +93,7 @@ def http_cache_or_download(url: str) -> str:
     except Exception:
         pass
 
-    logger.info(f"Downloading {url}...")
+    logger.info("Downloading %s...", url)
     subprocess.run(["curl", "--user-agent", USER_AGENT, "-o", path, "-s", url])
     return path.read_bytes().decode("utf-8")
 
@@ -114,7 +114,7 @@ def read_file_http(url: URL) -> str:
 
 
 def read_file(url: URL) -> str:
-    logger.debug(f"Reading {urlunparse(url)}...")
+    logger.debug("Reading %s...", urlunparse(url))
     scheme = url.scheme
     handler_name = f"read_file_{scheme}"
 
@@ -194,8 +194,8 @@ def closure_compile(path: Path):
     proc = subprocess.run(params, cwd=path, capture_output=True)
 
     for err_line in proc.stderr.decode("utf-8").splitlines():
-        logger.warning(f"[closure] {err_line.strip()}")
-    return proc.stdout.decode("utf-8").strip().replace("\n", "")
+        logger.warning("[closure] %s", err_line.strip())
+    return (Path(path) / "output.js").read_text().strip()
 
 
 # Deps
@@ -466,7 +466,9 @@ def action_doctor():
                 else:
                     print("ERROR (run with --verbose for more info)")
             end_time = time.monotonic()
-            logger.debug(f"Check {name} took {end_time - start_time} seconds")
+            logger.debug(
+                "Check %s took %s seconds", name, end_time - start_time
+            )
 
 
 # Command-line arguments
@@ -530,9 +532,9 @@ ARGS = parser.parse_args()
 if ARGS.verbose:
     logger.setLevel(logging.DEBUG)
 
-logger.debug(f"Welcome to {NAME} v{VERSION}!")
-logger.debug(f"Caching files in {CACHE_DIR}.")
-logger.debug(f"Using temporary directory {TEMPDIR}")
+logger.debug("Welcome to %s v%s!", NAME, VERSION)
+logger.debug("Caching files in %s.", CACHE_DIR)
+logger.debug("Using temporary directory %s", TEMPDIR)
 
 
 def main():
