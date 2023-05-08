@@ -139,7 +139,7 @@ def resolve_absolute(current: str, new: str) -> URL:
 
 # Closure compiler URL
 
-VER = "v20230206"
+VER = "v20230502"
 REPO = "https://repo1.maven.org/maven2"
 PROJECT = "com/google/javascript/closure-compiler"
 CLOSURE_URL = f"{REPO}/{PROJECT}/{VER}/closure-compiler-{VER}.jar"
